@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Leaf, Truck, Shield, PackageSearch } from 'lucide-react';
+// import { Link } from 'react-router-dom';
+import { Search, Leaf, Truck, Shield } from 'lucide-react';
 import { getProducts } from '@/services/storage';
 import type { Product } from '@/types';
 import Navbar from '@/components/Navbar';
