@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
   LogOut,
   TrendingUp,
   DollarSign,
@@ -12,19 +12,19 @@ import {
   BarChart3,
   Printer
 } from 'lucide-react';
-import { getProducts, getOrders, getSalesStats } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Product, Order } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [salesData, setSalesData] = useState<DailySales[]>([]);
-  const [statusData, setStatusData] = useState<{name: string; value: number}[]>([]);
+  const [statusData, setStatusData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     const isLoggedIn = sessionStorage.getItem('admin_logged_in');
@@ -61,61 +61,71 @@ export default function AdminDashboard() {
     loadDashboardData();
   }, [navigate]);
 
-  const loadDashboardData = () => {
-    const products = getProducts();
-    const salesStats = getSalesStats();
-    const orders = getOrders();
-    
-    setStats({
-      totalProducts: products.length,
-      totalOrders: salesStats.totalOrders,
-      totalSales: salesStats.totalSales,
-      pendingOrders: salesStats.pendingOrders,
-      completedOrders: salesStats.completedOrders
-    });
-    
-    setRecentOrders(salesStats.recentOrders);
-    
-    // Get low stock products (less than 10)
-    const lowStock = products.filter(p => p.stock < 10).sort((a, b) => a.stock - b.stock);
-    setLowStockProducts(lowStock);
-    
-    // Calculate daily sales for the last 7 days
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return date.toISOString().split('T')[0];
-    });
-    
-    const dailySales = last7Days.map(date => {
-      const dayOrders = orders.filter(o => 
-        o.createdAt.startsWith(date) && o.status === 'completed'
-      );
-      return {
-        date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
-        sales: dayOrders.reduce((sum, o) => sum + o.totalAmount, 0),
-        orders: dayOrders.length
+  const loadDashboardData = async () => {
+    try {
+      const [products, salesStats, orders] = await Promise.all([
+        api.getProducts(),
+        api.getSalesStats(),
+        api.getOrders()
+      ]);
+
+      setStats({
+        totalProducts: products.length,
+        totalOrders: salesStats.totalOrders,
+        totalSales: salesStats.totalSales,
+        pendingOrders: salesStats.pendingOrders,
+        completedOrders: salesStats.completedOrders
+      });
+
+      setRecentOrders(salesStats.recentOrders);
+
+      // Get low stock products (less than 10)
+      const lowStock = products.filter((p: Product) => p.stock < 10).sort((a: Product, b: Product) => a.stock - b.stock);
+      setLowStockProducts(lowStock);
+
+      // Calculate daily sales for the last 7 days
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (6 - i));
+        return date.toISOString().split('T')[0];
+      });
+
+      const dailySales = last7Days.map(date => {
+        const dayOrders = orders.filter((o: Order) =>
+          o.createdAt.startsWith(date) && o.status === 'completed'
+        );
+        return {
+          date: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+          sales: dayOrders.reduce((sum: number, o: Order) => sum + o.totalAmount, 0),
+          orders: dayOrders.length
+        };
+      });
+      setSalesData(dailySales);
+
+      // Order status distribution
+      const statusCounts = {
+        pending: orders.filter((o: Order) => o.status === 'pending').length,
+        processing: orders.filter((o: Order) => o.status === 'processing').length,
+        completed: orders.filter((o: Order) => o.status === 'completed').length,
+        cancelled: orders.filter((o: Order) => o.status === 'cancelled').length
       };
-    });
-    setSalesData(dailySales);
-    
-    // Order status distribution
-    const statusCounts = {
-      pending: orders.filter(o => o.status === 'pending').length,
-      processing: orders.filter(o => o.status === 'processing').length,
-      completed: orders.filter(o => o.status === 'completed').length,
-      cancelled: orders.filter(o => o.status === 'cancelled').length
-    };
-    
-    setStatusData([
-      { name: 'Pending', value: statusCounts.pending },
-      { name: 'Processing', value: statusCounts.processing },
-      { name: 'Completed', value: statusCounts.completed },
-      { name: 'Cancelled', value: statusCounts.cancelled }
-    ]);
+
+      setStatusData([
+        { name: 'Pending', value: statusCounts.pending },
+        { name: 'Processing', value: statusCounts.processing },
+        { name: 'Completed', value: statusCounts.completed },
+        { name: 'Cancelled', value: statusCounts.cancelled }
+      ]);
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+      // If it's a 401, logout
+      toast.error('Session expired or lost');
+      handleLogout();
+    }
   };
 
   const handleLogout = () => {
+    api.logout();
     sessionStorage.removeItem('admin_logged_in');
     toast.success('Logged out successfully');
     navigate('/admin/login');
@@ -164,7 +174,7 @@ export default function AdminDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Navigation Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 print:hidden">
-          <Card 
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => navigate('/admin/products')}
           >
@@ -179,7 +189,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card 
+          <Card
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => navigate('/admin/orders')}
           >
@@ -297,7 +307,7 @@ export default function AdminDashboard() {
                     fill="#8884d8"
                     paddingAngle={5}
                     dataKey="value"
-                    label={({name, value}) => value > 0 ? `${name}: ${value}` : ''}
+                    label={({ name, value }) => value > 0 ? `${name}: ${value}` : ''}
                   >
                     {statusData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -335,8 +345,8 @@ export default function AdminDashboard() {
                       <tr key={product.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-3">
-                            <img 
-                              src={product.image} 
+                            <img
+                              src={product.image}
                               alt={product.name}
                               className="w-10 h-10 rounded object-cover"
                             />
@@ -350,8 +360,8 @@ export default function AdminDashboard() {
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => navigate('/admin/products')}
                           >
@@ -394,7 +404,7 @@ export default function AdminDashboard() {
                     {recentOrders.map((order) => (
                       <tr key={order.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4 font-mono text-sm">
-                          #{order.id.slice(-8).toUpperCase()}
+                          #{order.id?.slice(-8).toUpperCase()}
                         </td>
                         <td className="py-3 px-4">{order.customerName}</td>
                         <td className="py-3 px-4 font-medium">৳{order.totalAmount}</td>

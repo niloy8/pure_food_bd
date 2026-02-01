@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { CheckCircle, Home, ShoppingBag, Phone, MapPin, User, Calendar } from 'lucide-react';
-import { getOrderById } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Order } from '@/types';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -15,11 +15,19 @@ export default function OrderConfirmation() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (orderId) {
-      const orderData = getOrderById(orderId);
-      setOrder(orderData || null);
-      setIsLoading(false);
+    async function fetchOrder() {
+      if (orderId) {
+        try {
+          const orderData = await api.getOrderById(orderId);
+          setOrder(orderData);
+        } catch (error) {
+          console.error('Failed to fetch order:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
     }
+    fetchOrder();
   }, [orderId]);
 
   if (isLoading) {
@@ -66,9 +74,8 @@ export default function OrderConfirmation() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      
+
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Success Message */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
             <CheckCircle className="h-12 w-12 text-green-600" />
@@ -81,11 +88,10 @@ export default function OrderConfirmation() {
 
         <Card className="mb-6">
           <CardContent className="p-6">
-            {/* Order Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
               <div>
                 <p className="text-sm text-gray-500">Order ID</p>
-                <p className="font-mono font-medium">#{order.id.slice(-8).toUpperCase()}</p>
+                <p className="font-mono font-medium">#{order.id?.slice(-8).toUpperCase()}</p>
               </div>
               <div className="mt-2 sm:mt-0">
                 <Badge className={getStatusColor(order.status)}>
@@ -94,7 +100,6 @@ export default function OrderConfirmation() {
               </div>
             </div>
 
-            {/* Order Date */}
             <div className="flex items-center gap-2 text-sm text-gray-600 mb-6">
               <Calendar className="h-4 w-4" />
               <span>Ordered on {new Date(order.createdAt).toLocaleDateString('en-US', {
@@ -108,7 +113,6 @@ export default function OrderConfirmation() {
 
             <Separator className="my-4" />
 
-            {/* Customer Details */}
             <div className="space-y-3 mb-6">
               <h3 className="font-semibold text-gray-900">Delivery Details</h3>
               <div className="flex items-start gap-2">
@@ -127,7 +131,6 @@ export default function OrderConfirmation() {
 
             <Separator className="my-4" />
 
-            {/* Order Items */}
             <div className="space-y-3 mb-6">
               <h3 className="font-semibold text-gray-900">Order Items</h3>
               {order.items.map((item, index) => (
@@ -143,13 +146,11 @@ export default function OrderConfirmation() {
 
             <Separator className="my-4" />
 
-            {/* Order Total */}
             <div className="flex justify-between items-center">
               <span className="text-lg font-semibold">Total Amount</span>
               <span className="text-2xl font-bold text-green-600">৳{order.totalAmount}</span>
             </div>
 
-            {/* Notes */}
             {order.notes && (
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">
@@ -160,7 +161,6 @@ export default function OrderConfirmation() {
           </CardContent>
         </Card>
 
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/">
             <Button variant="outline" className="w-full sm:w-auto">

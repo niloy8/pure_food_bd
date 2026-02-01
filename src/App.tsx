@@ -1,8 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import { CartProvider } from '@/hooks/useCart';
-import { initializeSampleData, initializeAdmin } from '@/services/storage';
 import { Toaster } from '@/components/ui/sonner';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 // Customer Pages
 import Home from '@/pages/customer/Home';
@@ -19,11 +18,6 @@ import AdminProducts from '@/pages/admin/Products';
 import AdminOrders from '@/pages/admin/Orders';
 
 function App() {
-  useEffect(() => {
-    initializeAdmin();
-    initializeSampleData();
-  }, []);
-
   return (
     <CartProvider>
       <Router>
@@ -38,9 +32,12 @@ function App() {
 
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+          </Route>
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

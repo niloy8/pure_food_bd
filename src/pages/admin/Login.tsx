@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, Store } from 'lucide-react';
-import { verifyAdmin } from '@/services/storage';
+import { api } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!username.trim() || !password.trim()) {
       toast.error('Please enter both username and password');
       return;
@@ -24,18 +24,16 @@ export default function AdminLogin() {
 
     setIsLoading(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    if (verifyAdmin(username, password)) {
+    try {
+      await api.login({ username, password });
       sessionStorage.setItem('admin_logged_in', 'true');
       toast.success('Login successful!');
       navigate('/admin');
-    } else {
-      toast.error('Invalid credentials');
+    } catch (error) {
+      toast.error('Invalid credentials or connection error');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -66,7 +64,7 @@ export default function AdminLogin() {
                 className="mt-1"
               />
             </div>
-            
+
             <div>
               <Label htmlFor="password" className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
@@ -91,11 +89,7 @@ export default function AdminLogin() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500">
-              Default credentials: <strong>admin / admin123</strong>
-            </p>
-          </div>
+
 
           <div className="mt-4 text-center">
             <Button

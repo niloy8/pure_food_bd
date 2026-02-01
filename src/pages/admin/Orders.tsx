@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  ShoppingCart, 
+import {
+  ArrowLeft,
+  ShoppingCart,
   Search,
   Eye,
   CheckCircle,
@@ -17,7 +17,7 @@ import {
   Printer,
   FileText
 } from 'lucide-react';
-import { getOrders, updateOrderStatus, deleteOrder } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Order } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,44 +48,54 @@ export default function AdminOrders() {
 
   useEffect(() => {
     let filtered = orders;
-    
+
     if (searchQuery) {
-      filtered = filtered.filter(o => 
-        o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.phone.includes(searchQuery) ||
+      filtered = filtered.filter(o =>
+        (o.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (o.phone || '').includes(searchQuery) ||
         o.id.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
-    
+
     if (statusFilter !== 'all') {
       filtered = filtered.filter(o => o.status === statusFilter);
     }
-    
+
     setFilteredOrders(filtered);
   }, [searchQuery, statusFilter, orders]);
 
-  const loadOrders = () => {
-    const allOrders = getOrders();
-    // Sort by date, newest first
-    allOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    setOrders(allOrders);
-    setFilteredOrders(allOrders);
-  };
-
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
-    updateOrderStatus(orderId, newStatus);
-    toast.success(`Order status updated to ${newStatus}`);
-    loadOrders();
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
+  const loadOrders = async () => {
+    try {
+      const allOrders = await api.getOrders();
+      setOrders(allOrders);
+      setFilteredOrders(allOrders);
+    } catch (error) {
+      toast.error('Failed to load orders');
     }
   };
 
-  const handleDelete = (orderId: string) => {
-    if (window.confirm('Are you sure you want to delete this order?')) {
-      deleteOrder(orderId);
-      toast.success('Order deleted successfully');
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      await api.updateOrderStatus(orderId, newStatus);
+      toast.success(`Order status updated to ${newStatus}`);
       loadOrders();
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: newStatus });
+      }
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleDelete = async (orderId: string) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      try {
+        await api.deleteOrder(orderId);
+        toast.success('Order deleted successfully');
+        loadOrders();
+      } catch (error) {
+        toast.error('Failed to delete order');
+      }
     }
   };
 
@@ -118,7 +128,7 @@ export default function AdminOrders() {
   const totalSales = orders
     .filter(o => o.status === 'completed')
     .reduce((sum, o) => sum + o.totalAmount, 0);
-  
+
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
   const completedOrders = orders.filter(o => o.status === 'completed').length;
 
@@ -224,7 +234,7 @@ export default function AdminOrders() {
                   {filteredOrders.map((order) => (
                     <tr key={order.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4 font-mono text-sm">
-                        #{order.id.slice(-8).toUpperCase()}
+                        #{order.id?.slice(-8).toUpperCase()}
                       </td>
                       <td className="py-3 px-4">
                         <div>
@@ -316,17 +326,14 @@ export default function AdminOrders() {
                   </Button>
                 </div>
               </DialogHeader>
-              
-              {/* Printable Invoice */}
+
               <div id="invoice" className="space-y-4 p-4">
-                {/* Invoice Header */}
                 <div className="text-center border-b pb-4 mb-4">
                   <h1 className="text-2xl font-bold text-green-600">Pure Food BD</h1>
                   <p className="text-gray-500">Fresh & Organic Food Products</p>
                   <p className="text-sm text-gray-400">Invoice / Order Receipt</p>
                 </div>
 
-                {/* Order Info */}
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-sm text-gray-500">Order ID</p>
@@ -344,7 +351,6 @@ export default function AdminOrders() {
 
                 <Separator />
 
-                {/* Customer Info */}
                 <div>
                   <h4 className="font-semibold mb-2">Bill To:</h4>
                   <div className="space-y-2 text-sm bg-gray-50 p-3 rounded">
@@ -365,7 +371,6 @@ export default function AdminOrders() {
 
                 <Separator />
 
-                {/* Order Items */}
                 <div>
                   <h4 className="font-semibold mb-2">Order Items</h4>
                   <table className="w-full">
@@ -390,13 +395,11 @@ export default function AdminOrders() {
                   </table>
                 </div>
 
-                {/* Total */}
                 <div className="flex justify-between items-center bg-gray-100 p-4 rounded">
                   <span className="font-semibold text-lg">Total Amount</span>
                   <span className="text-2xl font-bold text-green-600">৳{selectedOrder.totalAmount}</span>
                 </div>
 
-                {/* Notes */}
                 {selectedOrder.notes && (
                   <div className="bg-yellow-50 p-3 rounded-lg">
                     <p className="text-sm text-gray-600">
@@ -405,13 +408,11 @@ export default function AdminOrders() {
                   </div>
                 )}
 
-                {/* Footer */}
                 <div className="text-center text-sm text-gray-500 border-t pt-4 mt-4">
                   <p>Thank you for shopping with Pure Food BD!</p>
                   <p>For any queries, contact: +880 1XXX-XXXXXX</p>
                 </div>
 
-                {/* Status Update - Hidden in print */}
                 <div className="print:hidden">
                   <Separator className="my-4" />
                   <h4 className="font-semibold mb-2">Update Status</h4>

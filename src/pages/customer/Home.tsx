@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 // import { Link } from 'react-router-dom';
 import { Search, Leaf, Truck, Shield } from 'lucide-react';
-import { getProducts } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Product } from '@/types';
 import Navbar from '@/components/Navbar';
 import ProductCard from '@/components/ProductCard';
@@ -17,11 +17,16 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadProducts = () => {
-      const allProducts = getProducts();
-      setProducts(allProducts);
-      setFilteredProducts(allProducts);
-      setIsLoading(false);
+    const loadProducts = async () => {
+      try {
+        const allProducts = await api.getProducts();
+        setProducts(allProducts);
+        setFilteredProducts(allProducts);
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadProducts();

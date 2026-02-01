@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Minus, Check, Shield, Truck, Leaf } from 'lucide-react';
-import { getProductById } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Product } from '@/types';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -15,18 +15,30 @@ export default function ProductDetails() {
     const [product, setProduct] = useState<Product | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [added, setAdded] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const { addToCart } = useCart();
 
     useEffect(() => {
-        if (productId) {
-            const foundProduct = getProductById(productId);
-            if (foundProduct) {
-                setProduct(foundProduct);
-            } else {
-                toast.error('Product not found');
-                navigate('/');
+        async function fetchProduct() {
+            if (productId) {
+                try {
+                    const foundProduct = await api.getProductById(productId);
+                    if (foundProduct) {
+                        setProduct(foundProduct);
+                    } else {
+                        toast.error('Product not found');
+                        navigate('/');
+                    }
+                } catch (error) {
+                    console.error('Error fetching product:', error);
+                    toast.error('Product not found');
+                    navigate('/');
+                } finally {
+                    setIsLoading(false);
+                }
             }
         }
+        fetchProduct();
     }, [productId, navigate]);
 
     const handleAddToCart = () => {
@@ -58,10 +70,21 @@ export default function ProductDetails() {
         }
     };
 
-    if (!product) {
+    if (isLoading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+            </div>
+        );
+    }
+
+    if (!product) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">Product not found</h2>
+                    <Button onClick={() => navigate('/')}>Back to Home</Button>
+                </div>
             </div>
         );
     }

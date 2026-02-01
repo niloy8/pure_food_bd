@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Phone, User, FileText } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
-import { createOrder } from '@/services/storage';
+import { api } from '@/services/api';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +38,11 @@ export default function Checkout() {
       return;
     }
 
+    if (!formData.email.trim()) {
+      toast.error('Please enter your email');
+      return;
+    }
+
     if (!formData.phone.trim()) {
       toast.error('Please enter your phone number');
       return;
@@ -52,25 +57,31 @@ export default function Checkout() {
 
     try {
       const orderItems = cart.map(item => ({
-        productId: item.product.id,
-        productName: item.product.name,
+        product: item.product.id, // Backend expects product ID link
+        name: item.product.name,
         price: item.product.price,
         quantity: item.quantity
       }));
 
-      const order = createOrder({
-        customerName: formData.customerName,
-        phone: formData.phone,
-        address: formData.address,
+      const orderData = {
+        customerDetails: {
+          name: formData.customerName,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+        },
         items: orderItems,
         totalAmount: total,
         notes: formData.notes
-      });
+      };
+
+      const order = await api.createOrder(orderData);
 
       clearCart();
       toast.success('Order placed successfully!');
       navigate(`/order-confirmation/${order.id}`);
     } catch (error) {
+      console.error('Checkout error:', error);
       toast.error('Failed to place order. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -98,7 +109,6 @@ export default function Checkout() {
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div className="flex items-center mb-6">
           <Link to="/cart">
             <Button variant="ghost" size="sm">
@@ -110,7 +120,6 @@ export default function Checkout() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Delivery Form */}
           <div>
             <Card>
               <CardContent className="p-6">
@@ -156,7 +165,7 @@ export default function Checkout() {
                     <Input
                       id="phone"
                       name="phone"
-                      type='number'
+                      type='text'
                       placeholder="Enter your phone number"
                       value={formData.phone}
                       onChange={handleInputChange}
@@ -209,7 +218,6 @@ export default function Checkout() {
             </Card>
           </div>
 
-          {/* Order Summary */}
           <div>
             <Card className="sticky top-24">
               <CardContent className="p-6">

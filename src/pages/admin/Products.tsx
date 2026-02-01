@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Plus, 
-  Edit2, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Plus,
+  Edit2,
+  Trash2,
   Search,
   Package,
   Image as ImageIcon
 } from 'lucide-react';
-import { getProducts, addProduct, updateProduct, deleteProduct } from '@/services/storage';
+import { api } from '@/services/api';
 import type { Product } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -56,7 +56,7 @@ export default function AdminProducts() {
 
   useEffect(() => {
     if (searchQuery) {
-      setFilteredProducts(products.filter(p => 
+      setFilteredProducts(products.filter(p =>
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.category.toLowerCase().includes(searchQuery.toLowerCase())
       ));
@@ -65,10 +65,14 @@ export default function AdminProducts() {
     }
   }, [searchQuery, products]);
 
-  const loadProducts = () => {
-    const allProducts = getProducts();
-    setProducts(allProducts);
-    setFilteredProducts(allProducts);
+  const loadProducts = async () => {
+    try {
+      const allProducts = await api.getProducts();
+      setProducts(allProducts);
+      setFilteredProducts(allProducts);
+    } catch (error) {
+      toast.error('Failed to load products');
+    }
   };
 
   const handleOpenDialog = (product?: Product) => {
@@ -100,7 +104,7 @@ export default function AdminProducts() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name.trim() || !formData.price || !formData.stock || !formData.category.trim()) {
@@ -117,23 +121,30 @@ export default function AdminProducts() {
       image: formData.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400'
     };
 
-    if (editingProduct) {
-      updateProduct(editingProduct.id, productData);
-      toast.success('Product updated successfully');
-    } else {
-      addProduct(productData);
-      toast.success('Product added successfully');
+    try {
+      if (editingProduct) {
+        await api.updateProduct(editingProduct.id, productData);
+        toast.success('Product updated successfully');
+      } else {
+        await api.addProduct(productData);
+        toast.success('Product added successfully');
+      }
+      loadProducts();
+      handleCloseDialog();
+    } catch (error) {
+      toast.error('Failed to save product');
     }
-
-    loadProducts();
-    handleCloseDialog();
   };
 
-  const handleDelete = (productId: string) => {
+  const handleDelete = async (productId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      deleteProduct(productId);
-      toast.success('Product deleted successfully');
-      loadProducts();
+      try {
+        await api.deleteProduct(productId);
+        toast.success('Product deleted successfully');
+        loadProducts();
+      } catch (error) {
+        toast.error('Failed to delete product');
+      }
     }
   };
 
@@ -233,7 +244,7 @@ export default function AdminProducts() {
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
           </DialogHeader>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="name">Product Name *</Label>
